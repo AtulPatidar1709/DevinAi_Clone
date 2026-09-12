@@ -1,0 +1,2 @@
+export interface CommandResult { exitCode:number; stdout:string; stderr:string; }
+export async function runCommand(command:string,args:string[]=[],options:{timeoutMs?:number}={}):Promise<CommandResult>{const child=Bun.spawn([command,...args],{stdout:"pipe",stderr:"pipe"});const timer=setTimeout(()=>{try{child.kill()}catch{}},options.timeoutMs??30000);try{const [stdout,stderr,exitCode]=await Promise.all([new Response(child.stdout).text(),new Response(child.stderr).text(),child.exited]);return {exitCode,stdout:stdout.trim(),stderr:stderr.trim()}}finally{clearTimeout(timer)}}

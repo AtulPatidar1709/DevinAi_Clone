@@ -1,0 +1,78 @@
+model User {
+  id                    String               @id @default(cuid())
+  githubId              Int                  @unique
+  githubLogin           String
+  githubName            String?
+  githubEmail           String?
+  avatarUrl             String?
+  githubAccessToken     String?
+  githubRefreshToken    String?
+  githubTokenExpiresAt  DateTime?
+  githubRefreshExpiresAt DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  sessions              AuthSession[]
+  installations         GithubInstallation[]
+  installStates         GithubInstallState[]
+  oauthStates           GithubOAuthState[]
+  repositories          Repository[]
+  workspaces             Workspace[]
+}
+
+model AuthSession {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model GithubInstallation {
+  id                 String   @id @default(cuid())
+  installationId     Int      @unique
+  userId             String
+  accountId          Int
+  accountLogin       String
+  accountType        String
+  repositorySelection String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repositories       Repository[]
+
+  @@index([userId])
+  @@index([accountId])
+}
+
+model GithubInstallState {
+  id        String   @id @default(cuid())
+  stateHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model GithubOAuthState {
+  id        String   @id @default(cuid())
+  stateHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String?
+
+  @@index([expiresAt])
+  @@index([userId])
+}

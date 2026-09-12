@@ -1,0 +1,92 @@
+model Workspace {
+  id            String       @id @default(cuid())
+  userId        String
+  repositoryId  String?
+  name          String
+  workspaceKey  String       @unique
+  status        String       @default("active")
+  error         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository    Repository?           @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
+  repositories  WorkspaceRepository[]
+  sandboxes     Sandbox[]
+  agentTasks    AgentTask[]
+  messages      ChatMessage[]
+
+  @@index([userId])
+  @@index([repositoryId])
+}
+
+// One row per repository attached to a session. A single sandbox
+// container can hold several of these (e.g. a frontend + a backend repo),
+// each cloned into its own subfolder ("slug") and — if it has a dev/start
+// script — running on its own internally-assigned port.
+model WorkspaceRepository {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  repositoryId String
+  slug         String
+  port         Int?
+  previewPort  Int?
+  previewUrl   String?
+  status       String    @default("pending")
+  error        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, repositoryId])
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@index([repositoryId])
+}
+
+model Sandbox {
+  id          String    @id @default(cuid())
+  workspaceId String
+  containerId String    @unique
+  port        Int
+  codeServerPort Int
+  codeServerUrl String
+  previewUrl  String
+  status      String    @default("created")
+  error       String?
+  createdAt   DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model AgentTask {
+  id          String    @id @default(cuid())
+  workspaceId String
+  prompt      String
+  status      String    @default("pending")
+  result      Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model ChatMessage {
+  id          String    @id @default(cuid())
+  workspaceId String
+  role        String
+  content     String
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+}

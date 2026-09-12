@@ -1,0 +1,63 @@
+volumes:
+  postgres_data:
+  frontend_dist:
+  devine-sandbox-npm-cache:
+    external: false
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: devine
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Overrides whatever's in .env — keeps this file self-contained for
+      # local use without needing Neon or any cloud dependency.
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/devine
+      SANDBOX_PUBLIC_HOST: localhost
+      SANDBOX_CODE_SERVER_AUTH: none
+    ports:
+      - "3000:3000"
+    volumes:
+      # Grants the backend access to the HOST's Docker daemon so it can
+      # spawn sandbox containers as siblings of itself.
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+    # apps/frontend/Dockerfile's default CMD just copies the build output
+    # and exits (see docker-compose.yml's frontend-builder for that use).
+    # For local use we actually want it served — the final stage is
+    # already busybox, which ships its own tiny httpd, so use that
+    # instead of pulling in a separate web server.
+    command: sh -c "cp -r /dist/* /output/ && busybox httpd -f -p 5173 -h /output"
+    volumes:
+      - frontend_dist:/output
+    ports:
+      - "5173:5173"

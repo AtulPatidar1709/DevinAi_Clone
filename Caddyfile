@@ -1,0 +1,24 @@
+{
+	# Replace with your real email — Let's Encrypt uses this for expiry notices.
+	email you@example.com
+}
+
+# Replace devine.yourdomain.com with your actual domain. Caddy automatically
+# provisions and renews a Let's Encrypt certificate for it — no certbot,
+# no manual renewal.
+devine.yourdomain.com {
+	# Backend API, GitHub OAuth callback/webhook, and the SSE chat stream
+	# all live under /api — proxy those straight through.
+	handle /api/* {
+		reverse_proxy backend:3000
+	}
+
+	# Everything else is the built React app (static files).
+	handle {
+		root * /srv/frontend
+		try_files {path} /index.html
+		file_server
+	}
+
+	encode gzip
+}

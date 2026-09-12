@@ -1,0 +1,64 @@
+volumes:
+  frontend_dist:
+  caddy_data:
+  caddy_config:
+  # Shared npm cache across every sandbox container — see docker.provider.ts.
+  devine-sandbox-npm-cache:
+    external: false
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      # Only exposed so Caddy (on the same Docker network) can reach it;
+      # not published to the host, so it's not directly internet-facing.
+      - "3000"
+    volumes:
+      # Grants the backend access to the HOST's Docker daemon so it can
+      # `docker run/exec/rm` sandbox containers as siblings of itself —
+      # NOT a nested Docker-in-Docker daemon. This is what lets
+      # docker.provider.ts's shell-outs to the `docker` CLI work at all
+      # once the backend itself is containerized.
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - devine
+
+  frontend-builder:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        # Must be the PUBLIC api URL the browser will call — same domain,
+        # under /api, since Caddy proxies /api/* to the backend above.
+        VITE_API_URL: https://devine.yourdomain.com
+    volumes:
+      - frontend_dist:/output
+    # Runs once, copies the built static files into the shared volume,
+    # then exits — it's not a long-running service.
+    restart: "no"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend-builder
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - frontend_dist:/srv/frontend:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - devine
+
+networks:
+  devine:
+    driver: bridge
